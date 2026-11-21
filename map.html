@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>鐘位坐標配對</title>
+<style>
+:root{--bg:#10161c;--pn:#1a232c;--ln:#2a3641;--tx:#e8edf1;--mu:#8a98a5;--ac:#f2b134;--ok:#4ade80;--bad:#f87171}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,"Noto Sans TC","PingFang HK","Microsoft JhengHei",sans-serif;overscroll-behavior:none}
+#app{display:flex;flex-direction:column;height:100%;padding-top:env(safe-area-inset-top)}
+header{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid var(--ln);font-size:15px}
+header button{background:none;border:0;color:var(--mu);font-size:20px;padding:0 4px}
+.view{display:none;flex:1;min-height:0;flex-direction:column}
+.view.on{display:flex}
+button{font:inherit;color:var(--tx)}
+/* start view */
+#stage{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;gap:4px;padding:4px}
+.slot{position:relative;flex:1;min-height:0;background:var(--pn);border:1px solid var(--ln);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.slot img{max-width:100%;max-height:100%;object-fit:contain}
+.slot .tag{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.7);color:var(--ac);font-weight:700;padding:2px 9px;border-radius:6px;font-size:18px}
+.slot.empty{opacity:.35}
+#dist{position:absolute;top:10px;left:10px;z-index:5;background:rgba(0,0,0,.75);color:var(--ok);font-weight:700;font-size:18px;padding:3px 10px;border-radius:6px}
+#xmark{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:30vw;font-weight:800;color:var(--bad);opacity:.8;pointer-events:none;z-index:4}
+#info{padding:6px 12px;border-top:1px solid var(--ln);font-size:13px;line-height:1.45}
+#addr{color:var(--tx)}#coord{color:var(--mu);font-variant-numeric:tabular-nums}
+#st{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--ln);font-size:14px}
+#stDot{width:11px;height:11px;border-radius:50%;background:var(--mu);flex:none}
+#stDot.run{background:var(--ac);animation:pl 1.2s ease-in-out infinite}
+#stDot.hit{background:var(--ok)}
+@keyframes pl{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){#stDot.run{animation:none}}
+#stTxt{flex:1;font-weight:600}
+#stAcc{font-size:13px;color:var(--mu)}
+#stAcc.good{color:var(--ok)}#stAcc.mid{color:var(--ac)}#stAcc.bad{color:var(--bad)}
+#hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--mu);font-size:18px;line-height:1.7;z-index:3;pointer-events:none;padding:20px}
+#dist.none{color:var(--mu)}
+#near{color:var(--ac)}
+/* input view */
+#vInput{overflow-y:auto;padding:10px 12px}
+#vInput label.f{display:block;color:var(--mu);font-size:13px;margin:0 0 4px}
+input[type=text]{width:100%;background:var(--bg);border:1px solid var(--ln);border-radius:8px;color:var(--tx);padding:10px;font-size:16px;margin-bottom:6px}
+input:focus{outline:2px solid var(--ac);outline-offset:0}
+#chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
+.chip{background:var(--pn);border:1px solid var(--ln);border-radius:14px;padding:3px 11px;font-size:14px}
+.chip.on{border-color:var(--ac);color:var(--ac)}
+.card{background:var(--pn);border:1px solid var(--ln);border-radius:10px;padding:10px;margin-bottom:10px}
+.ch{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ch b{font-size:16px;color:var(--ac)}
+.sm{background:var(--bg);border:1px solid var(--ac);color:var(--ac);border-radius:8px;padding:6px 12px;font-size:14px}
+.ph{display:flex;align-items:center;gap:10px}
+.ph .pick{background:var(--bg);border:1px solid var(--ln);border-radius:8px;padding:8px 14px;font-size:14px}
+.ph .th{position:relative;width:72px;height:72px;border-radius:6px;background:var(--bg);border:1px solid var(--ln);overflow:hidden}
+.ph .th img{width:100%;height:100%;object-fit:cover}
+.ph .th span{position:absolute;left:0;bottom:0;background:rgba(0,0,0,.7);color:var(--ac);font-size:12px;padding:1px 5px}
+/* map view */
+#mapWrap{flex:1;min-height:0;position:relative}
+#map,#mapFrame{position:absolute;inset:0;width:100%;height:100%;border:0}
+#mapFrame{display:none}
+#mapInfo{padding:6px 12px;font-size:13px;color:var(--mu);border-top:1px solid var(--ln)}
+/* bars */
+.bar{display:none;gap:8px;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid var(--ln);background:var(--bg)}
+.bar.on{display:flex}
+.bar button{flex:1;padding:14px 4px;border-radius:10px;border:1px solid var(--ln);background:var(--pn);font-size:17px;font-weight:600}
+.bar .pri{background:var(--ac);color:#1b1300;border-color:var(--ac)}
+.bar .stop{background:var(--bad);color:#200;border-color:var(--bad)}
+.bar .dng{color:var(--bad)}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#000c;color:#fff;padding:8px 16px;border-radius:20px;font-size:14px;display:none;z-index:99;max-width:90%;text-align:center}
+</style>
+</head>
+<body>
+<div id="app">
+ <header><span>鐘位坐標配對</span><button id="gear" title="Google Maps API Key">⚙</button></header>
+
+ <section id="vMain" class="view on">
+  <div id="st"><span id="stDot"></span><span id="stTxt">未開始</span><span id="stAcc"></span></div>
+  <div id="stage">
+   <div id="hint">按「開始」<br>量度現在位置<br>入到鐘位 6 米內就會出相</div>
+   <div id="dist" class="none">x</div>
+   <div id="xmark">X</div>
+   <div class="slot empty"></div><div class="slot empty"></div><div class="slot empty"></div>
+  </div>
+  <div id="info"><div id="near"></div><div id="addr">—</div><div id="coord">—</div></div>
+ </section>
+
+ <section id="vInput" class="view">
+  <label class="f">鐘位号碼（最多 21 組）　已記 <span id="cnt">0</span>/21</label>
+  <input type="text" id="no" inputmode="text" placeholder="例如 12">
+  <div id="chips"></div>
+  <div id="cards"></div>
+ </section>
+
+ <section id="vMap" class="view">
+  <div id="mapWrap"><div id="map"></div><iframe id="mapFrame" title="map"></iframe></div>
+  <div id="mapInfo">—</div>
+ </section>
+
+ <div class="bar on" id="bar1">
+  <button id="bStart" class="pri">開始</button><button id="bMap">地圖</button><button id="bIn">輸入</button>
+ </div>
+ <div class="bar" id="bar2">
+  <button id="bNext" class="pri">下一組</button><button id="bDone">完成</button><button id="bDel" class="dng">刪除</button><button id="bBack2">返回</button>
+ </div>
+ <div class="bar" id="bar3"><button id="bBack3">返回</button></div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const L='abc';
+let groups=[];            // 已儲存：[{no, pts:[{name,co,img} x4]}]
+let cur=blank();          // 輸入中
+let started=false,watchId=null,pos=null,view='main';
+
+/* ---------- 工具 ---------- */
+function toast(t){const e=$('toast');e.textContent=t;e.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>e.style.display='none',2200)}
+function blank(){return{no:'',pts:[0,1,2,3].map(()=>({name:'',co:'',img:''}))}}
+function parse(s){const m=(s||'').match(/-?\d+(?:\.\d+)?/g);if(!m||m.length<2)return null;const a=+m[0],b=+m[1];if(Math.abs(a)>90||Math.abs(b)>180)return null;return[a,b]}
+function hav(a,b,c,d){const R=6371000,r=Math.PI/180,x=(c-a)*r,y=(d-b)*r;const h=Math.sin(x/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(y/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+function fmt(m){return m>=1000?(m/1000).toFixed(2)+' km':Math.round(m)+' 米'}
+function labFor(no,i){return (no||(i?'節':'鐘位'))+(i?L[i-1]:'')}
+
+/* ---------- IndexedDB ---------- */
+const DB=()=>new Promise((res,rej)=>{const r=indexedDB.open('geo21',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+async function kvGet(k){try{const db=await DB();return await new Promise(r=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch(e){return null}}
+async function kvSet(k,v){try{const db=await DB();return await new Promise(r=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>r(true);t.onerror=()=>r(false)})}catch(e){return false}}
+async function kvDel(k){try{const db=await DB();return await new Promise(r=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=()=>r(true);t.onerror=()=>r(false)})}catch(e){return false}}
+
+/* ---------- 地名 ---------- */
+async function rev(lat,lng){
+  try{
+    if(window.google&&google.maps&&google.maps.Geocoder&&!keyBad){
+      const r=await new google.maps.Geocoder().geocode({location:{lat,lng}});
+      if(r.results&&r.results[0])return r.results[0].formatted_address.replace(/^[A-Z0-9+]{4,}\+?[A-Z0-9]*\s*/,'');
+    }
+  }catch(e){}
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&accept-language=zh-HK&lat='+lat+'&lon='+lng);
+    const j=await r.json();
+    if(j.display_name)return j.display_name.split(',').slice(0,3).join(' ').trim();
+  }catch(e){}
+  return lat.toFixed(5)+','+lng.toFixed(5);
+}
+function getPos(){return new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{enableHighAccuracy:true,timeout:15000,maximumAge:0}))}
+
+/* ---------- 順序 ---------- */
+function seq(){
+  const a=[...groups].sort((x,y)=>String(x.no).localeCompare(String(y.no),undefined,{numeric:true}));
+  const out=[];
+  a.forEach(g=>g.pts.forEach((p,i)=>{const c=parse(p.co);if(c)out.push({label:g.no+(i?L[i-1]:''),name:p.name,lat:c[0],lng:c[1],img:p.img})}));
+  return out;
+}
+
+/* ---------- 視圖 ---------- */
+function show(v){
+  view=v;
+  $('vMain').classList.toggle('on',v==='main');
+  $('vInput').classList.toggle('on',v==='input');
+  $('vMap').classList.toggle('on',v==='map');
+  $('bar1').classList.toggle('on',v==='main');
+  $('bar2').classList.toggle('on',v==='input');
+  $('bar3').classList.toggle('on',v==='map');
+}
+
+/* ---------- 開始 / 配對 ---------- */
+function setStart(on){
+  started=on;
+  const b=$('bStart');b.textContent=on?'停止':'開始';b.classList.toggle('pri',!on);b.classList.toggle('stop',on);
+  if(on){
+    if(!navigator.geolocation){toast('此裝置不支援定位');started=false;return}
+    watchId=navigator.geolocation.watchPosition(onPos,e=>{$('addr').textContent='定位失敗：'+e.message},{enableHighAccuracy:true,maximumAge:1000,timeout:20000});
+    setSt('run','定位中…');$('addr').textContent='定位中…';
+  }else{
+    if(watchId!=null)navigator.geolocation.clearWatch(watchId);watchId=null;
+    renderMatch(null);
+  }
+}
+let lastGeo={t:0,lat:0,lng:0};
+function onPos(p){
+  pos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};
+  if(started){
+    renderMatch(pos);
+    $('coord').textContent=pos.lat.toFixed(6)+', '+pos.lng.toFixed(6)+'　±'+Math.round(pos.acc)+' 米';
+    const now=Date.now();
+    if(now-lastGeo.t>15000&&(!lastGeo.t||hav(pos.lat,pos.lng,lastGeo.lat,lastGeo.lng)>25)){
+      lastGeo={t:now,lat:pos.lat,lng:pos.lng};
+      rev(pos.lat,pos.lng).then(a=>{if(started)$('addr').textContent=a});
+    }
+  }
+  if(view==='map')renderMap();
+}
+function setSt(c,t){$('stDot').className=c;$('stTxt').textContent=t}
+function renderMatch(p){
+  const slots=[...document.querySelectorAll('.slot')];
+  slots.forEach(s=>{s.className='slot empty';s.innerHTML=''});
+  const dist=$('dist'),xm=$('xmark'),hint=$('hint'),nr=$('near');
+  hint.style.display='none';xm.style.display='none';nr.textContent='';
+  dist.textContent='x';dist.className='none';
+  if(!p){hint.style.display='flex';setSt('','未開始');$('stAcc').textContent='';$('stAcc').className='';$('addr').textContent='—';$('coord').textContent='—';return}
+  const acc=Math.round(p.acc);
+  $('stAcc').textContent='精度 ±'+acc+' 米';$('stAcc').className=acc<=10?'good':acc<=20?'mid':'bad';
+  const S=seq();
+  if(!S.length){setSt('run','運行中');xm.style.display='flex';nr.textContent='未有鐘位資料，請先按「輸入」';return}
+  let ni=0,nd=1e12;
+  const hits=[];
+  S.forEach((s,i)=>{const d=hav(p.lat,p.lng,s.lat,s.lng);if(d<nd){nd=d;ni=i}if(d<=6)hits.push({i,d,s})});
+  if(!hits.length){
+    setSt('run','搜尋中，未到任何點');xm.style.display='flex';
+    nr.textContent='最近：'+S[ni].label+'　'+fmt(nd)+(acc>6?'　（精度較差，可能配唔到）':'');
+    return;
+  }
+  hits.sort((a,b)=>a.i-b.i);
+  setSt('hit','已配對：'+hits.map(h=>h.s.label).join('、'));
+  hits.slice(0,3).forEach((h,k)=>{
+    const sl=slots[k];sl.className='slot';
+    if(h.s.img){const im=document.createElement('img');im.src=h.s.img;sl.appendChild(im)}
+    else{sl.style.color='var(--mu)';sl.textContent='未有相片'}
+    const t=document.createElement('div');t.className='tag';t.textContent=h.s.label;sl.appendChild(t);
+  });
+  const near=[...hits].sort((a,b)=>a.d-b.d)[0];
+  const nx=S[near.i+1];
+  if(nx){dist.textContent='→ '+nx.label+'　'+fmt(hav(p.lat,p.lng,nx.lat,nx.lng));dist.className='';nr.textContent='下一個：'+nx.label+(nx.name?'　'+nx.name:'')}
+  else{dist.textContent='x';dist.className='none';nr.textContent='已係最後一個'}
+}
+
+/* ---------- 地圖 ---------- */
+let gmapsP=null,keyBad=false,map=null,markers=[],lastFrame='';
+function loadGmaps(){
+  const k=localStorage.getItem('gmkey');
+  if(!k||keyBad)return Promise.reject();
+  if(window.google&&google.maps)return Promise.resolve();
+  if(!gmapsP)gmapsP=new Promise((res,rej)=>{window.__gm=res;const s=document.createElement('script');s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(k)+'&callback=__gm&language=zh-HK';s.onerror=()=>{gmapsP=null;rej()};document.head.appendChild(s)});
+  return gmapsP;
+}
+window.gm_authFailure=()=>{keyBad=true;map=null;toast('API Key 無效，改用簡易地圖');if(view==='map')renderMap()};
+async function openMap(){
+  show('map');
+  $('mapInfo').textContent='定位中…';
+  if(!pos){try{const p=await getPos();pos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy}}catch(e){$('mapInfo').textContent='未能取得現在位置';return}}
+  renderMap();
+}
+async function renderMap(){
+  if(!pos)return;
+  const S=seq();
+  if(!S.length){$('mapInfo').textContent='未有鐘位資料，請先輸入';return}
+  let ni=0,nd=1e12;S.forEach((s,i)=>{const d=hav(pos.lat,pos.lng,s.lat,s.lng);if(d<nd){nd=d;ni=i}});
+  const near=S[ni],nx=S[ni+1]||null;
+  $('mapInfo').textContent='最近：'+near.label+'（'+fmt(nd)+'）'+(nx?'　下一個：'+nx.label+'（'+fmt(hav(pos.lat,pos.lng,nx.lat,nx.lng))+'）':'　下一個：x');
+  try{
+    await loadGmaps();
+    $('mapFrame').style.display='none';$('map').style.display='block';
+    const here={lat:pos.lat,lng:pos.lng};
+    if(!map)map=new google.maps.Map($('map'),{center:here,zoom:18,disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy'});
+    markers.forEach(m=>m.setMap(null));markers=[];
+    const b=new google.maps.LatLngBounds();
+    markers.push(new google.maps.Marker({map,position:here,title:'現在位置',icon:{path:google.maps.SymbolPath.CIRCLE,scale:9,fillColor:'#4285f4',fillOpacity:1,strokeColor:'#fff',strokeWeight:3}}));b.extend(here);
+    const pts=[near];if(nx)pts.push(nx);
+    pts.forEach((s,k)=>{const pp={lat:s.lat,lng:s.lng};markers.push(new google.maps.Marker({map,position:pp,label:{text:s.label,fontWeight:'700'},title:s.name||s.label}));b.extend(pp)});
+    map.fitBounds(b,50);
+    google.maps.event.addListenerOnce(map,'idle',()=>{if(map.getZoom()>19)map.setZoom(19)});
+  }catch(e){
+    $('map').style.display='none';$('mapFrame').style.display='block';
+    let u='https://maps.google.com/maps?output=embed&dirflg=w&saddr='+pos.lat+','+pos.lng+'&daddr='+near.lat+','+near.lng+(nx?'+to:'+nx.lat+','+nx.lng:'');
+    const key=near.label+'|'+(nx?nx.label:'');
+    if(key!==lastFrame){lastFrame=key;$('mapFrame').src=u}
+  }
+}
+
+/* ---------- 輸入 ---------- */
+function renderChips(){
+  $('cnt').textContent=groups.length;
+  const c=$('chips');c.innerHTML='';
+  [...groups].sort((x,y)=>String(x.no).localeCompare(String(y.no),undefined,{numeric:true})).forEach(g=>{
+    const b=document.createElement('button');b.className='chip'+(g.no===cur.no?' on':'');b.textContent=g.no;
+    b.onclick=()=>{cur=JSON.parse(JSON.stringify(g));renderForm()};
+    c.appendChild(b);
+  });
+}
+function renderForm(){
+  $('no').value=cur.no;
+  renderChips();
+  const box=$('cards');box.innerHTML='';
+  cur.pts.forEach((p,i)=>{
+    const d=document.createElement('div');d.className='card';
+    d.innerHTML='<div class="ch"><b class="lb"></b><button class="sm">現坐標</button></div>'+
+      '<input type="text" class="nm" placeholder="地方名（可編輯）">'+
+      '<input type="text" class="co" inputmode="decimal" placeholder="緯度,經度">'+
+      '<div class="ph"><label class="pick">相片<input type="file" accept="image/*" hidden></label><div class="th"><img><span></span></div></div>';
+    const lb=d.querySelector('.lb'),nm=d.querySelector('.nm'),co=d.querySelector('.co'),im=d.querySelector('.th img'),sp=d.querySelector('.th span'),fi=d.querySelector('input[type=file]');
+    const upd=()=>{const t=labFor(cur.no,i);lb.textContent=(i?'節點 ':'鐘位 ')+t;sp.textContent=t;im.style.display=p.img?'block':'none';if(p.img)im.src=p.img};
+    d.upd=upd;
+    nm.value=p.name;co.value=p.co;
+    nm.oninput=()=>p.name=nm.value;
+    co.oninput=()=>p.co=co.value;
+    d.querySelector('.sm').onclick=async()=>{
+      const b=d.querySelector('.sm');b.textContent='定位中…';
+      try{
+        const r=await getPos();const la=r.coords.latitude,lo=r.coords.longitude;
+        p.co=la.toFixed(6)+','+lo.toFixed(6);co.value=p.co;
+        p.name=await rev(la,lo);nm.value=p.name;
+      }catch(e){toast('未能取得現在位置')}
+      b.textContent='現坐標';
+    };
+    fi.onchange=async()=>{const f=fi.files[0];if(!f)return;p.img=await shrink(f);upd();fi.value=''};
+    upd();box.appendChild(d);
+  });
+}
+$('no').oninput=e=>{cur.no=e.target.value.trim();document.querySelectorAll('#cards .card').forEach(c=>c.upd&&c.upd())};
+function shrink(file){
+  return new Promise(res=>{
+    const u=URL.createObjectURL(file),im=new Image();
+    im.onload=()=>{const m=640,s=Math.min(1,m/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);res(c.toDataURL('image/jpeg',.72))};
+    im.onerror=()=>{URL.revokeObjectURL(u);res('')};
+    im.src=u;
+  });
+}
+function validate(){
+  if(!cur.no){toast('請輸入鐘位号碼');return false}
+  if(!parse(cur.pts[0].co)){toast('鐘位坐標不正確（例：22.2800,114.1500）');return false}
+  for(let i=1;i<4;i++){if(cur.pts[i].co.trim()&&!parse(cur.pts[i].co)){toast('節點 '+cur.no+L[i-1]+' 坐標不正確');return false}}
+  const idx=groups.findIndex(g=>g.no===cur.no);
+  if(idx<0&&groups.length>=21){toast('最多 21 組');return false}
+  return true;
+}
+async function commit(){
+  const g=JSON.parse(JSON.stringify(cur));
+  const idx=groups.findIndex(x=>x.no===g.no);
+  if(idx>=0)groups[idx]=g;else groups.push(g);
+  await kvSet('groups',groups);
+}
+$('bNext').onclick=async()=>{
+  if(!validate())return;
+  await commit();toast('已記錄 '+cur.no+'，請輸入下一組');
+  cur=blank();renderForm();$('vInput').scrollTop=0;
+};
+$('bDone').onclick=async()=>{
+  if(cur.no||parse(cur.pts[0].co)){if(!validate())return;await commit()}
+  await kvSet('groups',groups);
+  toast('已儲存 '+groups.length+' 組');
+  cur=blank();show('main');
+};
+$('bDel').onclick=async()=>{
+  if(!confirm('清除全部已儲存資料？'))return;
+  groups=[];cur=blank();await kvDel('groups');renderForm();toast('已清除');
+};
+$('bBack2').onclick=()=>show('main');
+$('bBack3').onclick=()=>show('main');
+$('bIn').onclick=()=>{renderForm();show('input')};
+$('bMap').onclick=openMap;
+$('bStart').onclick=()=>setStart(!started);
+$('gear').onclick=()=>{
+  const k=prompt('輸入 Google Maps API Key（Maps JavaScript API）。留空 = 用簡易地圖',localStorage.getItem('gmkey')||'');
+  if(k===null)return;
+  if(k.trim())localStorage.setItem('gmkey',k.trim());else localStorage.removeItem('gmkey');
+  toast('已儲存，重新載入…');setTimeout(()=>location.reload(),600);
+};
+
+/* ---------- 啟動：自動載入 ---------- */
+(async()=>{
+  const g=await kvGet('groups');
+  if(Array.isArray(g)){groups=g;toast('已載入 '+g.length+' 組')}
+  if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();
+})();
+</script>
+</body>
+</html>
